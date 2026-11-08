@@ -3,6 +3,7 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction
 from qgis.core import QgsApplication
 from .provider import GDBPostgresProvider
+from .style_autoload import PostgresStyleAutoLoader
 
 
 class GDBPostgresPlugin:
@@ -10,8 +11,11 @@ class GDBPostgresPlugin:
         self.iface = iface
         self.provider = None
         self.action = None
+        self.style_loader = None
 
     def initGui(self):
+        self.style_loader = PostgresStyleAutoLoader()
+        self.style_loader.start()
         self.provider = GDBPostgresProvider()
         QgsApplication.processingRegistry().addProvider(self.provider)
         self.action = QAction(QIcon(os.path.join(os.path.dirname(__file__), "icon.svg")),
@@ -25,6 +29,9 @@ class GDBPostgresPlugin:
         processing.execAlgorithmDialog("gdb_to_postgresql:gdb_to_postgres_domains_styles", {})
 
     def unload(self):
+        if self.style_loader is not None:
+            self.style_loader.stop()
+            self.style_loader = None
         if self.action is not None:
             self.iface.removeToolBarIcon(self.action)
             self.iface.removePluginMenu("GDB to PostgreSQL", self.action)

@@ -8,7 +8,7 @@ Install as a Processing script in the QGIS Processing scripts folder.
 """
 
 import os
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
 from qgis.core import (
     QgsProcessing,
     QgsProcessingAlgorithm,
@@ -40,7 +40,7 @@ class GDBToPostgresWithDomainsAndStyles(QgsProcessingAlgorithm):
     PG_DATABASE = "PG_DATABASE"
     PG_SCHEMA = "PG_SCHEMA"
     PG_USER = "PG_USER"
-    PG_PASSWORD = "PG_PASSWORD"
+    PG_CREDENTIAL = "PG_CREDENTIAL"
     ADD_TO_PROJECT = "ADD_TO_PROJECT"
 
     def name(self):
@@ -120,7 +120,7 @@ class GDBToPostgresWithDomainsAndStyles(QgsProcessingAlgorithm):
             )
         )
         password_param = QgsProcessingParameterString(
-            self.PG_PASSWORD, "PostgreSQL password", multiLine=False
+            self.PG_CREDENTIAL, "PostgreSQL password", multiLine=False
         )
         self.addParameter(password_param)
 
@@ -450,7 +450,7 @@ class GDBToPostgresWithDomainsAndStyles(QgsProcessingAlgorithm):
         database = self.parameterAsString(parameters, self.PG_DATABASE, context).strip()
         schema = self.parameterAsString(parameters, self.PG_SCHEMA, context).strip()
         username = self.parameterAsString(parameters, self.PG_USER, context).strip()
-        password = self.parameterAsString(parameters, self.PG_PASSWORD, context)
+        password = self.parameterAsString(parameters, self.PG_CREDENTIAL, context)
         add_to_project = self.parameterAsInt(parameters, self.ADD_TO_PROJECT, context)
 
         if not gdb_path or not os.path.isdir(gdb_path):
@@ -637,15 +637,15 @@ class GDBToPostgresWithDomainsAndStyles(QgsProcessingAlgorithm):
                         code = source_srs.GetAuthorityCode(None)
                         if authority and authority.upper() == "EPSG" and code:
                             source_srid = int(code)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        feedback.pushWarning("Optional metadata lookup failed: {}".format(exc))
                     if source_srid is None and source_crs.isValid():
                         try:
                             srid_candidate = int(source_crs.postgisSrid())
                             if srid_candidate > 0:
                                 source_srid = srid_candidate
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            feedback.pushWarning("Optional metadata lookup failed: {}".format(exc))
                     if source_crs.isValid():
                         if not gpkg_layer.crs().isValid() or gpkg_layer.crs() != source_crs:
                             # Assignment only; no coordinate transformation.
@@ -834,8 +834,8 @@ class GDBToPostgresWithDomainsAndStyles(QgsProcessingAlgorithm):
                                 dn = sf.GetDomainName()
                                 fcsubtype_map = (domains_dict.get(dn) or
                                                  domains_dict.get(str(dn).lower())) if dn else None
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                feedback.pushWarning("Optional metadata lookup failed: {}".format(exc))
                             if not fcsubtype_map:
                                 fcsubtype_map = subtype_maps.get(source_name.lower())
                             break
